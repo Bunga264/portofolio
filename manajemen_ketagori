@@ -1,0 +1,102 @@
+<?php
+session_start();
+require "db.php";
+
+if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+    header("Location: login.php");
+    exit;
+}
+
+// Handle tambah kategori
+if (isset($_POST['tambah_kategori'])) {
+    $nama_kategori = trim($_POST['nama_kategori']);
+    if ($nama_kategori !== '') {
+        // Cek kategori sudah ada atau belum
+        $stmt = $conn->prepare("SELECT id_kategori FROM kategori WHERE nama_kategori = ?");
+        $stmt->bind_param("s", $nama_kategori);
+        $stmt->execute();
+        $stmt->store_result();
+        if ($stmt->num_rows == 0) {
+            $stmt->close();
+            $stmt = $conn->prepare("INSERT INTO kategori (nama_kategori) VALUES (?)");
+            $stmt->bind_param("s", $nama_kategori);
+            $stmt->execute();
+        }
+        $stmt->close();
+    }
+    header("Location: manajemen_kategori.php");
+    exit;
+}
+
+// Handle hapus kategori
+if (isset($_GET['hapus'])) {
+    $id = (int)$_GET['hapus'];
+    // Optional: cek dulu apakah ada buku yang pakai kategori ini sebelum hapus (untuk integritas data)
+    $stmt = $conn->prepare("SELECT id_book FROM books WHERE id_kategori = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->store_result();
+    if ($stmt->num_rows == 0) {
+        $stmt->close();
+        $conn->query("DELETE FROM kategori WHERE id_kategori = $id");
+    }
+    $stmt->close();
+    header("Location: manajemen_kategori.php");
+    exit;
+}
+
+// Ambil semua kategori
+$result = $conn->query("SELECT * FROM kategori ORDER BY nama_kategori ASC");
+?>
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Manajemen Kategori - Admin</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; background:#f0f4f8; }
+h2 { color:#003366; }
+table { width: 100%; border-collapse: collapse; background: white; }
+th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+th { background: #003366; color: white; }
+form { margin-bottom: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+input { padding: 8px; width: 100%; margin: 6px 0 12px 0; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; }
+button { background: #0077cc; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; }
+button:hover { background: #005fa3; }
+a { color: #0077cc; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.alert { color: red; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<h2>Manajemen Kategori</h2>
+
+<form method="POST">
+    <label>Nama Kategori (Genre Buku)</label>
+    <input type="text" name="nama_kategori" required />
+    <button type="submit" name="tambah_kategori">Tambah Kategori</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Nama Kategori</th>
+            <th>Aksi</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php while($row = $result->fetch_assoc()): ?>
+        <tr>
+            <td><?=htmlspecialchars($row['nama_kategori'])?></td>
+            <td>
+                <a href="manajemen_kategori.php?hapus=<?=$row['id_kategori']?>" onclick="return confirm('Hapus kategori ini? Pastikan tidak ada buku yang menggunakan kategori ini.')">Hapus</a>
+            </td>
+        </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
+
+</body>
+</html>
